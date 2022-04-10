@@ -2,18 +2,21 @@ name: 'Add github comment'
 description: 'Add a PR status as a comment'
 author: 'Bright Network'
 inputs:
-  body:
-    required: false
-    description: 'the comment body'
-  template:
-    required: false
-    description: 'template to use for the comment body'
-  id:
-    required: false
-    description: 'the id to use for de-duplication. Different from the github comment id'
   token:
     description: 'GITHUB_TOKEN or a repo scoped PAT.'
     default: ${{ github.token }}
+  id:
+    required: false
+    description: 'the id to use for de-duplication. Different from the github comment id'
+  body:
+    required: false
+    description: 'the comment body'
+  template-path:
+    required: false
+    description: 'path to the template to use for the comment body'
+  template-var:
+    required: false
+    description: 'additional variable use during templating'
 runs:
   using: 'node16'
   main: 'dist/index.js'

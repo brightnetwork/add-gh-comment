@@ -1,6 +1,6 @@
 import type * as github from "@actions/github";
 
-type Octokit = ReturnType<typeof github.getOctokit>;
+export type Octokit = ReturnType<typeof github.getOctokit>;
 
 type Context = {
   repo: string;
@@ -9,7 +9,7 @@ type Context = {
   octokit: Octokit;
 };
 
-const UNIQUE_ID = "1c3c3b02-bb4e-46f1-a516-90d8ab4261b6";
+export const UNIQUE_ID = "1c3c3b02-bb4e-46f1-a516-90d8ab4261b6";
 
 const getSignature = (id: string): string => `<!-- ${UNIQUE_ID}:${id} -->`;
 
@@ -21,7 +21,10 @@ const isCommentSigned =
   (comment: { body?: string }): boolean =>
     !!comment.body?.includes(getSignature(id));
 
-export const removeComments = (id: string, context: Context) =>
+export const removeComments = (
+  id: string,
+  context: Context,
+): Promise<unknown> =>
   context.octokit.rest.issues
     .listComments({
       issue_number: context.issue_number,
@@ -44,7 +47,7 @@ export const removeComments = (id: string, context: Context) =>
 export const addComment = (
   comment: { id: string; body: string },
   context: Context,
-) =>
+): Promise<unknown> =>
   context.octokit.rest.issues.createComment({
     body: signComment(comment.id, comment.body),
     issue_number: context.issue_number,

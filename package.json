@@ -2,7 +2,7 @@
   "name": "add-gh-comment",
   "version": "0.1.0",
   "description": "Add a github comment",
-  "main": "dist/index.js",
+  "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
     "format": "prettier --write '**/*.ts'",
@@ -10,12 +10,13 @@
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
     "test": "jest",
-    "all": "npm run build && npm run format && npm run lint && npm run package && npm test"
+    "all": "npm run build && npm run format-check && npm run lint && npm run package && npm test"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@types/ejs": "^3.1.0",
+    "@types/jest": "^27.4.1",
     "@types/node": "^17.0.23",
     "@typescript-eslint/parser": "^5.18.0",
     "@vercel/ncc": "^0.33.3",
