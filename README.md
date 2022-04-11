@@ -35,7 +35,7 @@ The `id: frontend-coverage` here ensure the de-duplication. If a comment created
 Templating is done with [ejs](https://ejs.co/).
 The full github action context is available in the templating context.
 
-```
+```html
 <%= context.payload.pull_request.head.sha %> **CI check: comment from template**
 
 <details>
