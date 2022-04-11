@@ -1,6 +1,8 @@
-import * as ejs from "ejs";
+import Mustache from "mustache";
+import * as fs from "fs";
 
-export const render = (
-  template: string,
+export const render = async (
+  templatePath: string,
   data: Record<string, unknown>,
-): Promise<string> => ejs.renderFile(template, data);
+): Promise<string> =>
+  Mustache.render(fs.readFileSync(templatePath).toString(), data);

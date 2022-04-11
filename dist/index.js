@@ -155,10 +155,23 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.render = void 0;
-const ejs = __importStar(__nccwpck_require__(8431));
-const render = (template, data) => ejs.renderFile(template, data);
+const mustache_1 = __importDefault(__nccwpck_require__(8272));
+const fs = __importStar(__nccwpck_require__(7147));
+const render = (templatePath, data) => __awaiter(void 0, void 0, void 0, function* () { return mustache_1.default.render(fs.readFileSync(templatePath).toString(), data); });
 exports.render = render;
 
 
@@ -4154,1140 +4167,6 @@ exports.Deprecation = Deprecation;
 
 /***/ }),
 
-/***/ 8431:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-/*
- * EJS Embedded JavaScript templates
- * Copyright 2112 Matthew Eernisse (mde@fleegix.org)
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
-*/
-
-
-
-/**
- * @file Embedded JavaScript templating engine. {@link http://ejs.co}
- * @author Matthew Eernisse <mde@fleegix.org>
- * @author Tiancheng "Timothy" Gu <timothygu99@gmail.com>
- * @project EJS
- * @license {@link http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0}
- */
-
-/**
- * EJS internal functions.
- *
- * Technically this "module" lies in the same file as {@link module:ejs}, for
- * the sake of organization all the private functions re grouped into this
- * module.
- *
- * @module ejs-internal
- * @private
- */
-
-/**
- * Embedded JavaScript templating engine.
- *
- * @module ejs
- * @public
- */
-
-var fs = __nccwpck_require__(7147);
-var path = __nccwpck_require__(1017);
-var utils = __nccwpck_require__(356);
-
-var scopeOptionWarned = false;
-/** @type {string} */
-var _VERSION_STRING = (__nccwpck_require__(3558)/* .version */ .i8);
-var _DEFAULT_OPEN_DELIMITER = '<';
-var _DEFAULT_CLOSE_DELIMITER = '>';
-var _DEFAULT_DELIMITER = '%';
-var _DEFAULT_LOCALS_NAME = 'locals';
-var _NAME = 'ejs';
-var _REGEX_STRING = '(<%%|%%>|<%=|<%-|<%_|<%#|<%|%>|-%>|_%>)';
-var _OPTS_PASSABLE_WITH_DATA = ['delimiter', 'scope', 'context', 'debug', 'compileDebug',
-  'client', '_with', 'rmWhitespace', 'strict', 'filename', 'async'];
-// We don't allow 'cache' option to be passed in the data obj for
-// the normal `render` call, but this is where Express 2 & 3 put it
-// so we make an exception for `renderFile`
-var _OPTS_PASSABLE_WITH_DATA_EXPRESS = _OPTS_PASSABLE_WITH_DATA.concat('cache');
-var _BOM = /^\uFEFF/;
-
-/**
- * EJS template function cache. This can be a LRU object from lru-cache NPM
- * module. By default, it is {@link module:utils.cache}, a simple in-process
- * cache that grows continuously.
- *
- * @type {Cache}
- */
-
-exports.cache = utils.cache;
-
-/**
- * Custom file loader. Useful for template preprocessing or restricting access
- * to a certain part of the filesystem.
- *
- * @type {fileLoader}
- */
-
-exports.fileLoader = fs.readFileSync;
-
-/**
- * Name of the object containing the locals.
- *
- * This variable is overridden by {@link Options}`.localsName` if it is not
- * `undefined`.
- *
- * @type {String}
- * @public
- */
-
-exports.localsName = _DEFAULT_LOCALS_NAME;
-
-/**
- * Promise implementation -- defaults to the native implementation if available
- * This is mostly just for testability
- *
- * @type {PromiseConstructorLike}
- * @public
- */
-
-exports.promiseImpl = (new Function('return this;'))().Promise;
-
-/**
- * Get the path to the included file from the parent file path and the
- * specified path.
- *
- * @param {String}  name     specified path
- * @param {String}  filename parent file path
- * @param {Boolean} [isDir=false] whether the parent file path is a directory
- * @return {String}
- */
-exports.resolveInclude = function(name, filename, isDir) {
-  var dirname = path.dirname;
-  var extname = path.extname;
-  var resolve = path.resolve;
-  var includePath = resolve(isDir ? filename : dirname(filename), name);
-  var ext = extname(name);
-  if (!ext) {
-    includePath += '.ejs';
-  }
-  return includePath;
-};
-
-/**
- * Try to resolve file path on multiple directories
- *
- * @param  {String}        name  specified path
- * @param  {Array<String>} paths list of possible parent directory paths
- * @return {String}
- */
-function resolvePaths(name, paths) {
-  var filePath;
-  if (paths.some(function (v) {
-    filePath = exports.resolveInclude(name, v, true);
-    return fs.existsSync(filePath);
-  })) {
-    return filePath;
-  }
-}
-
-/**
- * Get the path to the included file by Options
- *
- * @param  {String}  path    specified path
- * @param  {Options} options compilation options
- * @return {String}
- */
-function getIncludePath(path, options) {
-  var includePath;
-  var filePath;
-  var views = options.views;
-  var match = /^[A-Za-z]+:\\|^\//.exec(path);
-
-  // Abs path
-  if (match && match.length) {
-    path = path.replace(/^\/*/, '');
-    if (Array.isArray(options.root)) {
-      includePath = resolvePaths(path, options.root);
-    } else {
-      includePath = exports.resolveInclude(path, options.root || '/', true);
-    }
-  }
-  // Relative paths
-  else {
-    // Look relative to a passed filename first
-    if (options.filename) {
-      filePath = exports.resolveInclude(path, options.filename);
-      if (fs.existsSync(filePath)) {
-        includePath = filePath;
-      }
-    }
-    // Then look in any views directories
-    if (!includePath && Array.isArray(views)) {
-      includePath = resolvePaths(path, views);
-    }
-    if (!includePath && typeof options.includer !== 'function') {
-      throw new Error('Could not find the include file "' +
-          options.escapeFunction(path) + '"');
-    }
-  }
-  return includePath;
-}
-
-/**
- * Get the template from a string or a file, either compiled on-the-fly or
- * read from cache (if enabled), and cache the template if needed.
- *
- * If `template` is not set, the file specified in `options.filename` will be
- * read.
- *
- * If `options.cache` is true, this function reads the file from
- * `options.filename` so it must be set prior to calling this function.
- *
- * @memberof module:ejs-internal
- * @param {Options} options   compilation options
- * @param {String} [template] template source
- * @return {(TemplateFunction|ClientFunction)}
- * Depending on the value of `options.client`, either type might be returned.
- * @static
- */
-
-function handleCache(options, template) {
-  var func;
-  var filename = options.filename;
-  var hasTemplate = arguments.length > 1;
-
-  if (options.cache) {
-    if (!filename) {
-      throw new Error('cache option requires a filename');
-    }
-    func = exports.cache.get(filename);
-    if (func) {
-      return func;
-    }
-    if (!hasTemplate) {
-      template = fileLoader(filename).toString().replace(_BOM, '');
-    }
-  }
-  else if (!hasTemplate) {
-    // istanbul ignore if: should not happen at all
-    if (!filename) {
-      throw new Error('Internal EJS error: no file name or template '
-                    + 'provided');
-    }
-    template = fileLoader(filename).toString().replace(_BOM, '');
-  }
-  func = exports.compile(template, options);
-  if (options.cache) {
-    exports.cache.set(filename, func);
-  }
-  return func;
-}
-
-/**
- * Try calling handleCache with the given options and data and call the
- * callback with the result. If an error occurs, call the callback with
- * the error. Used by renderFile().
- *
- * @memberof module:ejs-internal
- * @param {Options} options    compilation options
- * @param {Object} data        template data
- * @param {RenderFileCallback} cb callback
- * @static
- */
-
-function tryHandleCache(options, data, cb) {
-  var result;
-  if (!cb) {
-    if (typeof exports.promiseImpl == 'function') {
-      return new exports.promiseImpl(function (resolve, reject) {
-        try {
-          result = handleCache(options)(data);
-          resolve(result);
-        }
-        catch (err) {
-          reject(err);
-        }
-      });
-    }
-    else {
-      throw new Error('Please provide a callback function');
-    }
-  }
-  else {
-    try {
-      result = handleCache(options)(data);
-    }
-    catch (err) {
-      return cb(err);
-    }
-
-    cb(null, result);
-  }
-}
-
-/**
- * fileLoader is independent
- *
- * @param {String} filePath ejs file path.
- * @return {String} The contents of the specified file.
- * @static
- */
-
-function fileLoader(filePath){
-  return exports.fileLoader(filePath);
-}
-
-/**
- * Get the template function.
- *
- * If `options.cache` is `true`, then the template is cached.
- *
- * @memberof module:ejs-internal
- * @param {String}  path    path for the specified file
- * @param {Options} options compilation options
- * @return {(TemplateFunction|ClientFunction)}
- * Depending on the value of `options.client`, either type might be returned
- * @static
- */
-
-function includeFile(path, options) {
-  var opts = utils.shallowCopy({}, options);
-  opts.filename = getIncludePath(path, opts);
-  if (typeof options.includer === 'function') {
-    var includerResult = options.includer(path, opts.filename);
-    if (includerResult) {
-      if (includerResult.filename) {
-        opts.filename = includerResult.filename;
-      }
-      if (includerResult.template) {
-        return handleCache(opts, includerResult.template);
-      }
-    }
-  }
-  return handleCache(opts);
-}
-
-/**
- * Re-throw the given `err` in context to the `str` of ejs, `filename`, and
- * `lineno`.
- *
- * @implements {RethrowCallback}
- * @memberof module:ejs-internal
- * @param {Error}  err      Error object
- * @param {String} str      EJS source
- * @param {String} flnm     file name of the EJS file
- * @param {Number} lineno   line number of the error
- * @param {EscapeCallback} esc
- * @static
- */
-
-function rethrow(err, str, flnm, lineno, esc) {
-  var lines = str.split('\n');
-  var start = Math.max(lineno - 3, 0);
-  var end = Math.min(lines.length, lineno + 3);
-  var filename = esc(flnm);
-  // Error context
-  var context = lines.slice(start, end).map(function (line, i){
-    var curr = i + start + 1;
-    return (curr == lineno ? ' >> ' : '    ')
-      + curr
-      + '| '
-      + line;
-  }).join('\n');
-
-  // Alter exception message
-  err.path = filename;
-  err.message = (filename || 'ejs') + ':'
-    + lineno + '\n'
-    + context + '\n\n'
-    + err.message;
-
-  throw err;
-}
-
-function stripSemi(str){
-  return str.replace(/;(\s*$)/, '$1');
-}
-
-/**
- * Compile the given `str` of ejs into a template function.
- *
- * @param {String}  template EJS template
- *
- * @param {Options} [opts] compilation options
- *
- * @return {(TemplateFunction|ClientFunction)}
- * Depending on the value of `opts.client`, either type might be returned.
- * Note that the return type of the function also depends on the value of `opts.async`.
- * @public
- */
-
-exports.compile = function compile(template, opts) {
-  var templ;
-
-  // v1 compat
-  // 'scope' is 'context'
-  // FIXME: Remove this in a future version
-  if (opts && opts.scope) {
-    if (!scopeOptionWarned){
-      console.warn('`scope` option is deprecated and will be removed in EJS 3');
-      scopeOptionWarned = true;
-    }
-    if (!opts.context) {
-      opts.context = opts.scope;
-    }
-    delete opts.scope;
-  }
-  templ = new Template(template, opts);
-  return templ.compile();
-};
-
-/**
- * Render the given `template` of ejs.
- *
- * If you would like to include options but not data, you need to explicitly
- * call this function with `data` being an empty object or `null`.
- *
- * @param {String}   template EJS template
- * @param {Object}  [data={}] template data
- * @param {Options} [opts={}] compilation and rendering options
- * @return {(String|Promise<String>)}
- * Return value type depends on `opts.async`.
- * @public
- */
-
-exports.render = function (template, d, o) {
-  var data = d || {};
-  var opts = o || {};
-
-  // No options object -- if there are optiony names
-  // in the data, copy them to options
-  if (arguments.length == 2) {
-    utils.shallowCopyFromList(opts, data, _OPTS_PASSABLE_WITH_DATA);
-  }
-
-  return handleCache(opts, template)(data);
-};
-
-/**
- * Render an EJS file at the given `path` and callback `cb(err, str)`.
- *
- * If you would like to include options but not data, you need to explicitly
- * call this function with `data` being an empty object or `null`.
- *
- * @param {String}             path     path to the EJS file
- * @param {Object}            [data={}] template data
- * @param {Options}           [opts={}] compilation and rendering options
- * @param {RenderFileCallback} cb callback
- * @public
- */
-
-exports.renderFile = function () {
-  var args = Array.prototype.slice.call(arguments);
-  var filename = args.shift();
-  var cb;
-  var opts = {filename: filename};
-  var data;
-  var viewOpts;
-
-  // Do we have a callback?
-  if (typeof arguments[arguments.length - 1] == 'function') {
-    cb = args.pop();
-  }
-  // Do we have data/opts?
-  if (args.length) {
-    // Should always have data obj
-    data = args.shift();
-    // Normal passed opts (data obj + opts obj)
-    if (args.length) {
-      // Use shallowCopy so we don't pollute passed in opts obj with new vals
-      utils.shallowCopy(opts, args.pop());
-    }
-    // Special casing for Express (settings + opts-in-data)
-    else {
-      // Express 3 and 4
-      if (data.settings) {
-        // Pull a few things from known locations
-        if (data.settings.views) {
-          opts.views = data.settings.views;
-        }
-        if (data.settings['view cache']) {
-          opts.cache = true;
-        }
-        // Undocumented after Express 2, but still usable, esp. for
-        // items that are unsafe to be passed along with data, like `root`
-        viewOpts = data.settings['view options'];
-        if (viewOpts) {
-          utils.shallowCopy(opts, viewOpts);
-        }
-      }
-      // Express 2 and lower, values set in app.locals, or people who just
-      // want to pass options in their data. NOTE: These values will override
-      // anything previously set in settings  or settings['view options']
-      utils.shallowCopyFromList(opts, data, _OPTS_PASSABLE_WITH_DATA_EXPRESS);
-    }
-    opts.filename = filename;
-  }
-  else {
-    data = {};
-  }
-
-  return tryHandleCache(opts, data, cb);
-};
-
-/**
- * Clear intermediate JavaScript cache. Calls {@link Cache#reset}.
- * @public
- */
-
-/**
- * EJS template class
- * @public
- */
-exports.Template = Template;
-
-exports.clearCache = function () {
-  exports.cache.reset();
-};
-
-function Template(text, opts) {
-  opts = opts || {};
-  var options = {};
-  this.templateText = text;
-  /** @type {string | null} */
-  this.mode = null;
-  this.truncate = false;
-  this.currentLine = 1;
-  this.source = '';
-  options.client = opts.client || false;
-  options.escapeFunction = opts.escape || opts.escapeFunction || utils.escapeXML;
-  options.compileDebug = opts.compileDebug !== false;
-  options.debug = !!opts.debug;
-  options.filename = opts.filename;
-  options.openDelimiter = opts.openDelimiter || exports.openDelimiter || _DEFAULT_OPEN_DELIMITER;
-  options.closeDelimiter = opts.closeDelimiter || exports.closeDelimiter || _DEFAULT_CLOSE_DELIMITER;
-  options.delimiter = opts.delimiter || exports.delimiter || _DEFAULT_DELIMITER;
-  options.strict = opts.strict || false;
-  options.context = opts.context;
-  options.cache = opts.cache || false;
-  options.rmWhitespace = opts.rmWhitespace;
-  options.root = opts.root;
-  options.includer = opts.includer;
-  options.outputFunctionName = opts.outputFunctionName;
-  options.localsName = opts.localsName || exports.localsName || _DEFAULT_LOCALS_NAME;
-  options.views = opts.views;
-  options.async = opts.async;
-  options.destructuredLocals = opts.destructuredLocals;
-  options.legacyInclude = typeof opts.legacyInclude != 'undefined' ? !!opts.legacyInclude : true;
-
-  if (options.strict) {
-    options._with = false;
-  }
-  else {
-    options._with = typeof opts._with != 'undefined' ? opts._with : true;
-  }
-
-  this.opts = options;
-
-  this.regex = this.createRegex();
-}
-
-Template.modes = {
-  EVAL: 'eval',
-  ESCAPED: 'escaped',
-  RAW: 'raw',
-  COMMENT: 'comment',
-  LITERAL: 'literal'
-};
-
-Template.prototype = {
-  createRegex: function () {
-    var str = _REGEX_STRING;
-    var delim = utils.escapeRegExpChars(this.opts.delimiter);
-    var open = utils.escapeRegExpChars(this.opts.openDelimiter);
-    var close = utils.escapeRegExpChars(this.opts.closeDelimiter);
-    str = str.replace(/%/g, delim)
-      .replace(/</g, open)
-      .replace(/>/g, close);
-    return new RegExp(str);
-  },
-
-  compile: function () {
-    /** @type {string} */
-    var src;
-    /** @type {ClientFunction} */
-    var fn;
-    var opts = this.opts;
-    var prepended = '';
-    var appended = '';
-    /** @type {EscapeCallback} */
-    var escapeFn = opts.escapeFunction;
-    /** @type {FunctionConstructor} */
-    var ctor;
-    /** @type {string} */
-    var sanitizedFilename = opts.filename ? JSON.stringify(opts.filename) : 'undefined';
-
-    if (!this.source) {
-      this.generateSource();
-      prepended +=
-        '  var __output = "";\n' +
-        '  function __append(s) { if (s !== undefined && s !== null) __output += s }\n';
-      if (opts.outputFunctionName) {
-        prepended += '  var ' + opts.outputFunctionName + ' = __append;' + '\n';
-      }
-      if (opts.destructuredLocals && opts.destructuredLocals.length) {
-        var destructuring = '  var __locals = (' + opts.localsName + ' || {}),\n';
-        for (var i = 0; i < opts.destructuredLocals.length; i++) {
-          var name = opts.destructuredLocals[i];
-          if (i > 0) {
-            destructuring += ',\n  ';
-          }
-          destructuring += name + ' = __locals.' + name;
-        }
-        prepended += destructuring + ';\n';
-      }
-      if (opts._with !== false) {
-        prepended +=  '  with (' + opts.localsName + ' || {}) {' + '\n';
-        appended += '  }' + '\n';
-      }
-      appended += '  return __output;' + '\n';
-      this.source = prepended + this.source + appended;
-    }
-
-    if (opts.compileDebug) {
-      src = 'var __line = 1' + '\n'
-        + '  , __lines = ' + JSON.stringify(this.templateText) + '\n'
-        + '  , __filename = ' + sanitizedFilename + ';' + '\n'
-        + 'try {' + '\n'
-        + this.source
-        + '} catch (e) {' + '\n'
-        + '  rethrow(e, __lines, __filename, __line, escapeFn);' + '\n'
-        + '}' + '\n';
-    }
-    else {
-      src = this.source;
-    }
-
-    if (opts.client) {
-      src = 'escapeFn = escapeFn || ' + escapeFn.toString() + ';' + '\n' + src;
-      if (opts.compileDebug) {
-        src = 'rethrow = rethrow || ' + rethrow.toString() + ';' + '\n' + src;
-      }
-    }
-
-    if (opts.strict) {
-      src = '"use strict";\n' + src;
-    }
-    if (opts.debug) {
-      console.log(src);
-    }
-    if (opts.compileDebug && opts.filename) {
-      src = src + '\n'
-        + '//# sourceURL=' + sanitizedFilename + '\n';
-    }
-
-    try {
-      if (opts.async) {
-        // Have to use generated function for this, since in envs without support,
-        // it breaks in parsing
-        try {
-          ctor = (new Function('return (async function(){}).constructor;'))();
-        }
-        catch(e) {
-          if (e instanceof SyntaxError) {
-            throw new Error('This environment does not support async/await');
-          }
-          else {
-            throw e;
-          }
-        }
-      }
-      else {
-        ctor = Function;
-      }
-      fn = new ctor(opts.localsName + ', escapeFn, include, rethrow', src);
-    }
-    catch(e) {
-      // istanbul ignore else
-      if (e instanceof SyntaxError) {
-        if (opts.filename) {
-          e.message += ' in ' + opts.filename;
-        }
-        e.message += ' while compiling ejs\n\n';
-        e.message += 'If the above error is not helpful, you may want to try EJS-Lint:\n';
-        e.message += 'https://github.com/RyanZim/EJS-Lint';
-        if (!opts.async) {
-          e.message += '\n';
-          e.message += 'Or, if you meant to create an async function, pass `async: true` as an option.';
-        }
-      }
-      throw e;
-    }
-
-    // Return a callable function which will execute the function
-    // created by the source-code, with the passed data as locals
-    // Adds a local `include` function which allows full recursive include
-    var returnedFn = opts.client ? fn : function anonymous(data) {
-      var include = function (path, includeData) {
-        var d = utils.shallowCopy({}, data);
-        if (includeData) {
-          d = utils.shallowCopy(d, includeData);
-        }
-        return includeFile(path, opts)(d);
-      };
-      return fn.apply(opts.context, [data || {}, escapeFn, include, rethrow]);
-    };
-    if (opts.filename && typeof Object.defineProperty === 'function') {
-      var filename = opts.filename;
-      var basename = path.basename(filename, path.extname(filename));
-      try {
-        Object.defineProperty(returnedFn, 'name', {
-          value: basename,
-          writable: false,
-          enumerable: false,
-          configurable: true
-        });
-      } catch (e) {/* ignore */}
-    }
-    return returnedFn;
-  },
-
-  generateSource: function () {
-    var opts = this.opts;
-
-    if (opts.rmWhitespace) {
-      // Have to use two separate replace here as `^` and `$` operators don't
-      // work well with `\r` and empty lines don't work well with the `m` flag.
-      this.templateText =
-        this.templateText.replace(/[\r\n]+/g, '\n').replace(/^\s+|\s+$/gm, '');
-    }
-
-    // Slurp spaces and tabs before <%_ and after _%>
-    this.templateText =
-      this.templateText.replace(/[ \t]*<%_/gm, '<%_').replace(/_%>[ \t]*/gm, '_%>');
-
-    var self = this;
-    var matches = this.parseTemplateText();
-    var d = this.opts.delimiter;
-    var o = this.opts.openDelimiter;
-    var c = this.opts.closeDelimiter;
-
-    if (matches && matches.length) {
-      matches.forEach(function (line, index) {
-        var closing;
-        // If this is an opening tag, check for closing tags
-        // FIXME: May end up with some false positives here
-        // Better to store modes as k/v with openDelimiter + delimiter as key
-        // Then this can simply check against the map
-        if ( line.indexOf(o + d) === 0        // If it is a tag
-          && line.indexOf(o + d + d) !== 0) { // and is not escaped
-          closing = matches[index + 2];
-          if (!(closing == d + c || closing == '-' + d + c || closing == '_' + d + c)) {
-            throw new Error('Could not find matching close tag for "' + line + '".');
-          }
-        }
-        self.scanLine(line);
-      });
-    }
-
-  },
-
-  parseTemplateText: function () {
-    var str = this.templateText;
-    var pat = this.regex;
-    var result = pat.exec(str);
-    var arr = [];
-    var firstPos;
-
-    while (result) {
-      firstPos = result.index;
-
-      if (firstPos !== 0) {
-        arr.push(str.substring(0, firstPos));
-        str = str.slice(firstPos);
-      }
-
-      arr.push(result[0]);
-      str = str.slice(result[0].length);
-      result = pat.exec(str);
-    }
-
-    if (str) {
-      arr.push(str);
-    }
-
-    return arr;
-  },
-
-  _addOutput: function (line) {
-    if (this.truncate) {
-      // Only replace single leading linebreak in the line after
-      // -%> tag -- this is the single, trailing linebreak
-      // after the tag that the truncation mode replaces
-      // Handle Win / Unix / old Mac linebreaks -- do the \r\n
-      // combo first in the regex-or
-      line = line.replace(/^(?:\r\n|\r|\n)/, '');
-      this.truncate = false;
-    }
-    if (!line) {
-      return line;
-    }
-
-    // Preserve literal slashes
-    line = line.replace(/\\/g, '\\\\');
-
-    // Convert linebreaks
-    line = line.replace(/\n/g, '\\n');
-    line = line.replace(/\r/g, '\\r');
-
-    // Escape double-quotes
-    // - this will be the delimiter during execution
-    line = line.replace(/"/g, '\\"');
-    this.source += '    ; __append("' + line + '")' + '\n';
-  },
-
-  scanLine: function (line) {
-    var self = this;
-    var d = this.opts.delimiter;
-    var o = this.opts.openDelimiter;
-    var c = this.opts.closeDelimiter;
-    var newLineCount = 0;
-
-    newLineCount = (line.split('\n').length - 1);
-
-    switch (line) {
-    case o + d:
-    case o + d + '_':
-      this.mode = Template.modes.EVAL;
-      break;
-    case o + d + '=':
-      this.mode = Template.modes.ESCAPED;
-      break;
-    case o + d + '-':
-      this.mode = Template.modes.RAW;
-      break;
-    case o + d + '#':
-      this.mode = Template.modes.COMMENT;
-      break;
-    case o + d + d:
-      this.mode = Template.modes.LITERAL;
-      this.source += '    ; __append("' + line.replace(o + d + d, o + d) + '")' + '\n';
-      break;
-    case d + d + c:
-      this.mode = Template.modes.LITERAL;
-      this.source += '    ; __append("' + line.replace(d + d + c, d + c) + '")' + '\n';
-      break;
-    case d + c:
-    case '-' + d + c:
-    case '_' + d + c:
-      if (this.mode == Template.modes.LITERAL) {
-        this._addOutput(line);
-      }
-
-      this.mode = null;
-      this.truncate = line.indexOf('-') === 0 || line.indexOf('_') === 0;
-      break;
-    default:
-      // In script mode, depends on type of tag
-      if (this.mode) {
-        // If '//' is found without a line break, add a line break.
-        switch (this.mode) {
-        case Template.modes.EVAL:
-        case Template.modes.ESCAPED:
-        case Template.modes.RAW:
-          if (line.lastIndexOf('//') > line.lastIndexOf('\n')) {
-            line += '\n';
-          }
-        }
-        switch (this.mode) {
-        // Just executing code
-        case Template.modes.EVAL:
-          this.source += '    ; ' + line + '\n';
-          break;
-          // Exec, esc, and output
-        case Template.modes.ESCAPED:
-          this.source += '    ; __append(escapeFn(' + stripSemi(line) + '))' + '\n';
-          break;
-          // Exec and output
-        case Template.modes.RAW:
-          this.source += '    ; __append(' + stripSemi(line) + ')' + '\n';
-          break;
-        case Template.modes.COMMENT:
-          // Do nothing
-          break;
-          // Literal <%% mode, append as raw output
-        case Template.modes.LITERAL:
-          this._addOutput(line);
-          break;
-        }
-      }
-      // In string mode, just add the output
-      else {
-        this._addOutput(line);
-      }
-    }
-
-    if (self.opts.compileDebug && newLineCount) {
-      this.currentLine += newLineCount;
-      this.source += '    ; __line = ' + this.currentLine + '\n';
-    }
-  }
-};
-
-/**
- * Escape characters reserved in XML.
- *
- * This is simply an export of {@link module:utils.escapeXML}.
- *
- * If `markup` is `undefined` or `null`, the empty string is returned.
- *
- * @param {String} markup Input string
- * @return {String} Escaped string
- * @public
- * @func
- * */
-exports.escapeXML = utils.escapeXML;
-
-/**
- * Express.js support.
- *
- * This is an alias for {@link module:ejs.renderFile}, in order to support
- * Express.js out-of-the-box.
- *
- * @func
- */
-
-exports.__express = exports.renderFile;
-
-/**
- * Version of EJS.
- *
- * @readonly
- * @type {String}
- * @public
- */
-
-exports.VERSION = _VERSION_STRING;
-
-/**
- * Name for detection of EJS.
- *
- * @readonly
- * @type {String}
- * @public
- */
-
-exports.name = _NAME;
-
-/* istanbul ignore if */
-if (typeof window != 'undefined') {
-  window.ejs = exports;
-}
-
-
-/***/ }),
-
-/***/ 356:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-/*
- * EJS Embedded JavaScript templates
- * Copyright 2112 Matthew Eernisse (mde@fleegix.org)
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
-*/
-
-/**
- * Private utility functions
- * @module utils
- * @private
- */
-
-
-
-var regExpChars = /[|\\{}()[\]^$+*?.]/g;
-
-/**
- * Escape characters reserved in regular expressions.
- *
- * If `string` is `undefined` or `null`, the empty string is returned.
- *
- * @param {String} string Input string
- * @return {String} Escaped string
- * @static
- * @private
- */
-exports.escapeRegExpChars = function (string) {
-  // istanbul ignore if
-  if (!string) {
-    return '';
-  }
-  return String(string).replace(regExpChars, '\\$&');
-};
-
-var _ENCODE_HTML_RULES = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&#34;',
-  "'": '&#39;'
-};
-var _MATCH_HTML = /[&<>'"]/g;
-
-function encode_char(c) {
-  return _ENCODE_HTML_RULES[c] || c;
-}
-
-/**
- * Stringified version of constants used by {@link module:utils.escapeXML}.
- *
- * It is used in the process of generating {@link ClientFunction}s.
- *
- * @readonly
- * @type {String}
- */
-
-var escapeFuncStr =
-  'var _ENCODE_HTML_RULES = {\n'
-+ '      "&": "&amp;"\n'
-+ '    , "<": "&lt;"\n'
-+ '    , ">": "&gt;"\n'
-+ '    , \'"\': "&#34;"\n'
-+ '    , "\'": "&#39;"\n'
-+ '    }\n'
-+ '  , _MATCH_HTML = /[&<>\'"]/g;\n'
-+ 'function encode_char(c) {\n'
-+ '  return _ENCODE_HTML_RULES[c] || c;\n'
-+ '};\n';
-
-/**
- * Escape characters reserved in XML.
- *
- * If `markup` is `undefined` or `null`, the empty string is returned.
- *
- * @implements {EscapeCallback}
- * @param {String} markup Input string
- * @return {String} Escaped string
- * @static
- * @private
- */
-
-exports.escapeXML = function (markup) {
-  return markup == undefined
-    ? ''
-    : String(markup)
-      .replace(_MATCH_HTML, encode_char);
-};
-exports.escapeXML.toString = function () {
-  return Function.prototype.toString.call(this) + ';\n' + escapeFuncStr;
-};
-
-/**
- * Naive copy of properties from one object to another.
- * Does not recurse into non-scalar properties
- * Does not check to see if the property has a value before copying
- *
- * @param  {Object} to   Destination object
- * @param  {Object} from Source object
- * @return {Object}      Destination object
- * @static
- * @private
- */
-exports.shallowCopy = function (to, from) {
-  from = from || {};
-  for (var p in from) {
-    to[p] = from[p];
-  }
-  return to;
-};
-
-/**
- * Naive copy of a list of key names, from one object to another.
- * Only copies property if it is actually defined
- * Does not recurse into non-scalar properties
- *
- * @param  {Object} to   Destination object
- * @param  {Object} from Source object
- * @param  {Array} list List of properties to copy
- * @return {Object}      Destination object
- * @static
- * @private
- */
-exports.shallowCopyFromList = function (to, from, list) {
-  for (var i = 0; i < list.length; i++) {
-    var p = list[i];
-    if (typeof from[p] != 'undefined') {
-      to[p] = from[p];
-    }
-  }
-  return to;
-};
-
-/**
- * Simple in-process cache implementation. Does not implement limits of any
- * sort.
- *
- * @implements {Cache}
- * @static
- * @private
- */
-exports.cache = {
-  _data: {},
-  set: function (key, val) {
-    this._data[key] = val;
-  },
-  get: function (key) {
-    return this._data[key];
-  },
-  remove: function (key) {
-    delete this._data[key];
-  },
-  reset: function () {
-    this._data = {};
-  }
-};
-
-/**
- * Transforms hyphen case variable into camel case.
- *
- * @param {String} string Hyphen case string
- * @return {String} Camel case string
- * @static
- * @private
- */
-exports.hyphenToCamel = function (str) {
-  return str.replace(/-[a-z]/g, function (match) { return match[1].toUpperCase(); });
-};
-
-
-/***/ }),
-
 /***/ 3287:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -5330,6 +4209,784 @@ function isPlainObject(o) {
 }
 
 exports.isPlainObject = isPlainObject;
+
+
+/***/ }),
+
+/***/ 8272:
+/***/ (function(module) {
+
+(function (global, factory) {
+   true ? module.exports = factory() :
+  0;
+}(this, (function () { 'use strict';
+
+  /*!
+   * mustache.js - Logic-less {{mustache}} templates with JavaScript
+   * http://github.com/janl/mustache.js
+   */
+
+  var objectToString = Object.prototype.toString;
+  var isArray = Array.isArray || function isArrayPolyfill (object) {
+    return objectToString.call(object) === '[object Array]';
+  };
+
+  function isFunction (object) {
+    return typeof object === 'function';
+  }
+
+  /**
+   * More correct typeof string handling array
+   * which normally returns typeof 'object'
+   */
+  function typeStr (obj) {
+    return isArray(obj) ? 'array' : typeof obj;
+  }
+
+  function escapeRegExp (string) {
+    return string.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, '\\$&');
+  }
+
+  /**
+   * Null safe way of checking whether or not an object,
+   * including its prototype, has a given property
+   */
+  function hasProperty (obj, propName) {
+    return obj != null && typeof obj === 'object' && (propName in obj);
+  }
+
+  /**
+   * Safe way of detecting whether or not the given thing is a primitive and
+   * whether it has the given property
+   */
+  function primitiveHasOwnProperty (primitive, propName) {
+    return (
+      primitive != null
+      && typeof primitive !== 'object'
+      && primitive.hasOwnProperty
+      && primitive.hasOwnProperty(propName)
+    );
+  }
+
+  // Workaround for https://issues.apache.org/jira/browse/COUCHDB-577
+  // See https://github.com/janl/mustache.js/issues/189
+  var regExpTest = RegExp.prototype.test;
+  function testRegExp (re, string) {
+    return regExpTest.call(re, string);
+  }
+
+  var nonSpaceRe = /\S/;
+  function isWhitespace (string) {
+    return !testRegExp(nonSpaceRe, string);
+  }
+
+  var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+
+  function escapeHtml (string) {
+    return String(string).replace(/[&<>"'`=\/]/g, function fromEntityMap (s) {
+      return entityMap[s];
+    });
+  }
+
+  var whiteRe = /\s*/;
+  var spaceRe = /\s+/;
+  var equalsRe = /\s*=/;
+  var curlyRe = /\s*\}/;
+  var tagRe = /#|\^|\/|>|\{|&|=|!/;
+
+  /**
+   * Breaks up the given `template` string into a tree of tokens. If the `tags`
+   * argument is given here it must be an array with two string values: the
+   * opening and closing tags used in the template (e.g. [ "<%", "%>" ]). Of
+   * course, the default is to use mustaches (i.e. mustache.tags).
+   *
+   * A token is an array with at least 4 elements. The first element is the
+   * mustache symbol that was used inside the tag, e.g. "#" or "&". If the tag
+   * did not contain a symbol (i.e. {{myValue}}) this element is "name". For
+   * all text that appears outside a symbol this element is "text".
+   *
+   * The second element of a token is its "value". For mustache tags this is
+   * whatever else was inside the tag besides the opening symbol. For text tokens
+   * this is the text itself.
+   *
+   * The third and fourth elements of the token are the start and end indices,
+   * respectively, of the token in the original template.
+   *
+   * Tokens that are the root node of a subtree contain two more elements: 1) an
+   * array of tokens in the subtree and 2) the index in the original template at
+   * which the closing tag for that section begins.
+   *
+   * Tokens for partials also contain two more elements: 1) a string value of
+   * indendation prior to that tag and 2) the index of that tag on that line -
+   * eg a value of 2 indicates the partial is the third tag on this line.
+   */
+  function parseTemplate (template, tags) {
+    if (!template)
+      return [];
+    var lineHasNonSpace = false;
+    var sections = [];     // Stack to hold section tokens
+    var tokens = [];       // Buffer to hold the tokens
+    var spaces = [];       // Indices of whitespace tokens on the current line
+    var hasTag = false;    // Is there a {{tag}} on the current line?
+    var nonSpace = false;  // Is there a non-space char on the current line?
+    var indentation = '';  // Tracks indentation for tags that use it
+    var tagIndex = 0;      // Stores a count of number of tags encountered on a line
+
+    // Strips all whitespace tokens array for the current line
+    // if there was a {{#tag}} on it and otherwise only space.
+    function stripSpace () {
+      if (hasTag && !nonSpace) {
+        while (spaces.length)
+          delete tokens[spaces.pop()];
+      } else {
+        spaces = [];
+      }
+
+      hasTag = false;
+      nonSpace = false;
+    }
+
+    var openingTagRe, closingTagRe, closingCurlyRe;
+    function compileTags (tagsToCompile) {
+      if (typeof tagsToCompile === 'string')
+        tagsToCompile = tagsToCompile.split(spaceRe, 2);
+
+      if (!isArray(tagsToCompile) || tagsToCompile.length !== 2)
+        throw new Error('Invalid tags: ' + tagsToCompile);
+
+      openingTagRe = new RegExp(escapeRegExp(tagsToCompile[0]) + '\\s*');
+      closingTagRe = new RegExp('\\s*' + escapeRegExp(tagsToCompile[1]));
+      closingCurlyRe = new RegExp('\\s*' + escapeRegExp('}' + tagsToCompile[1]));
+    }
+
+    compileTags(tags || mustache.tags);
+
+    var scanner = new Scanner(template);
+
+    var start, type, value, chr, token, openSection;
+    while (!scanner.eos()) {
+      start = scanner.pos;
+
+      // Match any text between tags.
+      value = scanner.scanUntil(openingTagRe);
+
+      if (value) {
+        for (var i = 0, valueLength = value.length; i < valueLength; ++i) {
+          chr = value.charAt(i);
+
+          if (isWhitespace(chr)) {
+            spaces.push(tokens.length);
+            indentation += chr;
+          } else {
+            nonSpace = true;
+            lineHasNonSpace = true;
+            indentation += ' ';
+          }
+
+          tokens.push([ 'text', chr, start, start + 1 ]);
+          start += 1;
+
+          // Check for whitespace on the current line.
+          if (chr === '\n') {
+            stripSpace();
+            indentation = '';
+            tagIndex = 0;
+            lineHasNonSpace = false;
+          }
+        }
+      }
+
+      // Match the opening tag.
+      if (!scanner.scan(openingTagRe))
+        break;
+
+      hasTag = true;
+
+      // Get the tag type.
+      type = scanner.scan(tagRe) || 'name';
+      scanner.scan(whiteRe);
+
+      // Get the tag value.
+      if (type === '=') {
+        value = scanner.scanUntil(equalsRe);
+        scanner.scan(equalsRe);
+        scanner.scanUntil(closingTagRe);
+      } else if (type === '{') {
+        value = scanner.scanUntil(closingCurlyRe);
+        scanner.scan(curlyRe);
+        scanner.scanUntil(closingTagRe);
+        type = '&';
+      } else {
+        value = scanner.scanUntil(closingTagRe);
+      }
+
+      // Match the closing tag.
+      if (!scanner.scan(closingTagRe))
+        throw new Error('Unclosed tag at ' + scanner.pos);
+
+      if (type == '>') {
+        token = [ type, value, start, scanner.pos, indentation, tagIndex, lineHasNonSpace ];
+      } else {
+        token = [ type, value, start, scanner.pos ];
+      }
+      tagIndex++;
+      tokens.push(token);
+
+      if (type === '#' || type === '^') {
+        sections.push(token);
+      } else if (type === '/') {
+        // Check section nesting.
+        openSection = sections.pop();
+
+        if (!openSection)
+          throw new Error('Unopened section "' + value + '" at ' + start);
+
+        if (openSection[1] !== value)
+          throw new Error('Unclosed section "' + openSection[1] + '" at ' + start);
+      } else if (type === 'name' || type === '{' || type === '&') {
+        nonSpace = true;
+      } else if (type === '=') {
+        // Set the tags for the next time around.
+        compileTags(value);
+      }
+    }
+
+    stripSpace();
+
+    // Make sure there are no open sections when we're done.
+    openSection = sections.pop();
+
+    if (openSection)
+      throw new Error('Unclosed section "' + openSection[1] + '" at ' + scanner.pos);
+
+    return nestTokens(squashTokens(tokens));
+  }
+
+  /**
+   * Combines the values of consecutive text tokens in the given `tokens` array
+   * to a single token.
+   */
+  function squashTokens (tokens) {
+    var squashedTokens = [];
+
+    var token, lastToken;
+    for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+      token = tokens[i];
+
+      if (token) {
+        if (token[0] === 'text' && lastToken && lastToken[0] === 'text') {
+          lastToken[1] += token[1];
+          lastToken[3] = token[3];
+        } else {
+          squashedTokens.push(token);
+          lastToken = token;
+        }
+      }
+    }
+
+    return squashedTokens;
+  }
+
+  /**
+   * Forms the given array of `tokens` into a nested tree structure where
+   * tokens that represent a section have two additional items: 1) an array of
+   * all tokens that appear in that section and 2) the index in the original
+   * template that represents the end of that section.
+   */
+  function nestTokens (tokens) {
+    var nestedTokens = [];
+    var collector = nestedTokens;
+    var sections = [];
+
+    var token, section;
+    for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+      token = tokens[i];
+
+      switch (token[0]) {
+        case '#':
+        case '^':
+          collector.push(token);
+          sections.push(token);
+          collector = token[4] = [];
+          break;
+        case '/':
+          section = sections.pop();
+          section[5] = token[2];
+          collector = sections.length > 0 ? sections[sections.length - 1][4] : nestedTokens;
+          break;
+        default:
+          collector.push(token);
+      }
+    }
+
+    return nestedTokens;
+  }
+
+  /**
+   * A simple string scanner that is used by the template parser to find
+   * tokens in template strings.
+   */
+  function Scanner (string) {
+    this.string = string;
+    this.tail = string;
+    this.pos = 0;
+  }
+
+  /**
+   * Returns `true` if the tail is empty (end of string).
+   */
+  Scanner.prototype.eos = function eos () {
+    return this.tail === '';
+  };
+
+  /**
+   * Tries to match the given regular expression at the current position.
+   * Returns the matched text if it can match, the empty string otherwise.
+   */
+  Scanner.prototype.scan = function scan (re) {
+    var match = this.tail.match(re);
+
+    if (!match || match.index !== 0)
+      return '';
+
+    var string = match[0];
+
+    this.tail = this.tail.substring(string.length);
+    this.pos += string.length;
+
+    return string;
+  };
+
+  /**
+   * Skips all text until the given regular expression can be matched. Returns
+   * the skipped string, which is the entire tail if no match can be made.
+   */
+  Scanner.prototype.scanUntil = function scanUntil (re) {
+    var index = this.tail.search(re), match;
+
+    switch (index) {
+      case -1:
+        match = this.tail;
+        this.tail = '';
+        break;
+      case 0:
+        match = '';
+        break;
+      default:
+        match = this.tail.substring(0, index);
+        this.tail = this.tail.substring(index);
+    }
+
+    this.pos += match.length;
+
+    return match;
+  };
+
+  /**
+   * Represents a rendering context by wrapping a view object and
+   * maintaining a reference to the parent context.
+   */
+  function Context (view, parentContext) {
+    this.view = view;
+    this.cache = { '.': this.view };
+    this.parent = parentContext;
+  }
+
+  /**
+   * Creates a new context using the given view with this context
+   * as the parent.
+   */
+  Context.prototype.push = function push (view) {
+    return new Context(view, this);
+  };
+
+  /**
+   * Returns the value of the given name in this context, traversing
+   * up the context hierarchy if the value is absent in this context's view.
+   */
+  Context.prototype.lookup = function lookup (name) {
+    var cache = this.cache;
+
+    var value;
+    if (cache.hasOwnProperty(name)) {
+      value = cache[name];
+    } else {
+      var context = this, intermediateValue, names, index, lookupHit = false;
+
+      while (context) {
+        if (name.indexOf('.') > 0) {
+          intermediateValue = context.view;
+          names = name.split('.');
+          index = 0;
+
+          /**
+           * Using the dot notion path in `name`, we descend through the
+           * nested objects.
+           *
+           * To be certain that the lookup has been successful, we have to
+           * check if the last object in the path actually has the property
+           * we are looking for. We store the result in `lookupHit`.
+           *
+           * This is specially necessary for when the value has been set to
+           * `undefined` and we want to avoid looking up parent contexts.
+           *
+           * In the case where dot notation is used, we consider the lookup
+           * to be successful even if the last "object" in the path is
+           * not actually an object but a primitive (e.g., a string, or an
+           * integer), because it is sometimes useful to access a property
+           * of an autoboxed primitive, such as the length of a string.
+           **/
+          while (intermediateValue != null && index < names.length) {
+            if (index === names.length - 1)
+              lookupHit = (
+                hasProperty(intermediateValue, names[index])
+                || primitiveHasOwnProperty(intermediateValue, names[index])
+              );
+
+            intermediateValue = intermediateValue[names[index++]];
+          }
+        } else {
+          intermediateValue = context.view[name];
+
+          /**
+           * Only checking against `hasProperty`, which always returns `false` if
+           * `context.view` is not an object. Deliberately omitting the check
+           * against `primitiveHasOwnProperty` if dot notation is not used.
+           *
+           * Consider this example:
+           * ```
+           * Mustache.render("The length of a football field is {{#length}}{{length}}{{/length}}.", {length: "100 yards"})
+           * ```
+           *
+           * If we were to check also against `primitiveHasOwnProperty`, as we do
+           * in the dot notation case, then render call would return:
+           *
+           * "The length of a football field is 9."
+           *
+           * rather than the expected:
+           *
+           * "The length of a football field is 100 yards."
+           **/
+          lookupHit = hasProperty(context.view, name);
+        }
+
+        if (lookupHit) {
+          value = intermediateValue;
+          break;
+        }
+
+        context = context.parent;
+      }
+
+      cache[name] = value;
+    }
+
+    if (isFunction(value))
+      value = value.call(this.view);
+
+    return value;
+  };
+
+  /**
+   * A Writer knows how to take a stream of tokens and render them to a
+   * string, given a context. It also maintains a cache of templates to
+   * avoid the need to parse the same template twice.
+   */
+  function Writer () {
+    this.templateCache = {
+      _cache: {},
+      set: function set (key, value) {
+        this._cache[key] = value;
+      },
+      get: function get (key) {
+        return this._cache[key];
+      },
+      clear: function clear () {
+        this._cache = {};
+      }
+    };
+  }
+
+  /**
+   * Clears all cached templates in this writer.
+   */
+  Writer.prototype.clearCache = function clearCache () {
+    if (typeof this.templateCache !== 'undefined') {
+      this.templateCache.clear();
+    }
+  };
+
+  /**
+   * Parses and caches the given `template` according to the given `tags` or
+   * `mustache.tags` if `tags` is omitted,  and returns the array of tokens
+   * that is generated from the parse.
+   */
+  Writer.prototype.parse = function parse (template, tags) {
+    var cache = this.templateCache;
+    var cacheKey = template + ':' + (tags || mustache.tags).join(':');
+    var isCacheEnabled = typeof cache !== 'undefined';
+    var tokens = isCacheEnabled ? cache.get(cacheKey) : undefined;
+
+    if (tokens == undefined) {
+      tokens = parseTemplate(template, tags);
+      isCacheEnabled && cache.set(cacheKey, tokens);
+    }
+    return tokens;
+  };
+
+  /**
+   * High-level method that is used to render the given `template` with
+   * the given `view`.
+   *
+   * The optional `partials` argument may be an object that contains the
+   * names and templates of partials that are used in the template. It may
+   * also be a function that is used to load partial templates on the fly
+   * that takes a single argument: the name of the partial.
+   *
+   * If the optional `config` argument is given here, then it should be an
+   * object with a `tags` attribute or an `escape` attribute or both.
+   * If an array is passed, then it will be interpreted the same way as
+   * a `tags` attribute on a `config` object.
+   *
+   * The `tags` attribute of a `config` object must be an array with two
+   * string values: the opening and closing tags used in the template (e.g.
+   * [ "<%", "%>" ]). The default is to mustache.tags.
+   *
+   * The `escape` attribute of a `config` object must be a function which
+   * accepts a string as input and outputs a safely escaped string.
+   * If an `escape` function is not provided, then an HTML-safe string
+   * escaping function is used as the default.
+   */
+  Writer.prototype.render = function render (template, view, partials, config) {
+    var tags = this.getConfigTags(config);
+    var tokens = this.parse(template, tags);
+    var context = (view instanceof Context) ? view : new Context(view, undefined);
+    return this.renderTokens(tokens, context, partials, template, config);
+  };
+
+  /**
+   * Low-level method that renders the given array of `tokens` using
+   * the given `context` and `partials`.
+   *
+   * Note: The `originalTemplate` is only ever used to extract the portion
+   * of the original template that was contained in a higher-order section.
+   * If the template doesn't use higher-order sections, this argument may
+   * be omitted.
+   */
+  Writer.prototype.renderTokens = function renderTokens (tokens, context, partials, originalTemplate, config) {
+    var buffer = '';
+
+    var token, symbol, value;
+    for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+      value = undefined;
+      token = tokens[i];
+      symbol = token[0];
+
+      if (symbol === '#') value = this.renderSection(token, context, partials, originalTemplate, config);
+      else if (symbol === '^') value = this.renderInverted(token, context, partials, originalTemplate, config);
+      else if (symbol === '>') value = this.renderPartial(token, context, partials, config);
+      else if (symbol === '&') value = this.unescapedValue(token, context);
+      else if (symbol === 'name') value = this.escapedValue(token, context, config);
+      else if (symbol === 'text') value = this.rawValue(token);
+
+      if (value !== undefined)
+        buffer += value;
+    }
+
+    return buffer;
+  };
+
+  Writer.prototype.renderSection = function renderSection (token, context, partials, originalTemplate, config) {
+    var self = this;
+    var buffer = '';
+    var value = context.lookup(token[1]);
+
+    // This function is used to render an arbitrary template
+    // in the current context by higher-order sections.
+    function subRender (template) {
+      return self.render(template, context, partials, config);
+    }
+
+    if (!value) return;
+
+    if (isArray(value)) {
+      for (var j = 0, valueLength = value.length; j < valueLength; ++j) {
+        buffer += this.renderTokens(token[4], context.push(value[j]), partials, originalTemplate, config);
+      }
+    } else if (typeof value === 'object' || typeof value === 'string' || typeof value === 'number') {
+      buffer += this.renderTokens(token[4], context.push(value), partials, originalTemplate, config);
+    } else if (isFunction(value)) {
+      if (typeof originalTemplate !== 'string')
+        throw new Error('Cannot use higher-order sections without the original template');
+
+      // Extract the portion of the original template that the section contains.
+      value = value.call(context.view, originalTemplate.slice(token[3], token[5]), subRender);
+
+      if (value != null)
+        buffer += value;
+    } else {
+      buffer += this.renderTokens(token[4], context, partials, originalTemplate, config);
+    }
+    return buffer;
+  };
+
+  Writer.prototype.renderInverted = function renderInverted (token, context, partials, originalTemplate, config) {
+    var value = context.lookup(token[1]);
+
+    // Use JavaScript's definition of falsy. Include empty arrays.
+    // See https://github.com/janl/mustache.js/issues/186
+    if (!value || (isArray(value) && value.length === 0))
+      return this.renderTokens(token[4], context, partials, originalTemplate, config);
+  };
+
+  Writer.prototype.indentPartial = function indentPartial (partial, indentation, lineHasNonSpace) {
+    var filteredIndentation = indentation.replace(/[^ \t]/g, '');
+    var partialByNl = partial.split('\n');
+    for (var i = 0; i < partialByNl.length; i++) {
+      if (partialByNl[i].length && (i > 0 || !lineHasNonSpace)) {
+        partialByNl[i] = filteredIndentation + partialByNl[i];
+      }
+    }
+    return partialByNl.join('\n');
+  };
+
+  Writer.prototype.renderPartial = function renderPartial (token, context, partials, config) {
+    if (!partials) return;
+    var tags = this.getConfigTags(config);
+
+    var value = isFunction(partials) ? partials(token[1]) : partials[token[1]];
+    if (value != null) {
+      var lineHasNonSpace = token[6];
+      var tagIndex = token[5];
+      var indentation = token[4];
+      var indentedValue = value;
+      if (tagIndex == 0 && indentation) {
+        indentedValue = this.indentPartial(value, indentation, lineHasNonSpace);
+      }
+      var tokens = this.parse(indentedValue, tags);
+      return this.renderTokens(tokens, context, partials, indentedValue, config);
+    }
+  };
+
+  Writer.prototype.unescapedValue = function unescapedValue (token, context) {
+    var value = context.lookup(token[1]);
+    if (value != null)
+      return value;
+  };
+
+  Writer.prototype.escapedValue = function escapedValue (token, context, config) {
+    var escape = this.getConfigEscape(config) || mustache.escape;
+    var value = context.lookup(token[1]);
+    if (value != null)
+      return (typeof value === 'number' && escape === mustache.escape) ? String(value) : escape(value);
+  };
+
+  Writer.prototype.rawValue = function rawValue (token) {
+    return token[1];
+  };
+
+  Writer.prototype.getConfigTags = function getConfigTags (config) {
+    if (isArray(config)) {
+      return config;
+    }
+    else if (config && typeof config === 'object') {
+      return config.tags;
+    }
+    else {
+      return undefined;
+    }
+  };
+
+  Writer.prototype.getConfigEscape = function getConfigEscape (config) {
+    if (config && typeof config === 'object' && !isArray(config)) {
+      return config.escape;
+    }
+    else {
+      return undefined;
+    }
+  };
+
+  var mustache = {
+    name: 'mustache.js',
+    version: '4.2.0',
+    tags: [ '{{', '}}' ],
+    clearCache: undefined,
+    escape: undefined,
+    parse: undefined,
+    render: undefined,
+    Scanner: undefined,
+    Context: undefined,
+    Writer: undefined,
+    /**
+     * Allows a user to override the default caching strategy, by providing an
+     * object with set, get and clear methods. This can also be used to disable
+     * the cache by setting it to the literal `undefined`.
+     */
+    set templateCache (cache) {
+      defaultWriter.templateCache = cache;
+    },
+    /**
+     * Gets the default or overridden caching object from the default writer.
+     */
+    get templateCache () {
+      return defaultWriter.templateCache;
+    }
+  };
+
+  // All high-level mustache.* functions use this writer.
+  var defaultWriter = new Writer();
+
+  /**
+   * Clears all cached templates in the default writer.
+   */
+  mustache.clearCache = function clearCache () {
+    return defaultWriter.clearCache();
+  };
+
+  /**
+   * Parses and caches the given template in the default writer and returns the
+   * array of tokens it contains. Doing this ahead of time avoids the need to
+   * parse templates on the fly as they are rendered.
+   */
+  mustache.parse = function parse (template, tags) {
+    return defaultWriter.parse(template, tags);
+  };
+
+  /**
+   * Renders the `template` with the given `view`, `partials`, and `config`
+   * using the default writer.
+   */
+  mustache.render = function render (template, view, partials, config) {
+    if (typeof template !== 'string') {
+      throw new TypeError('Invalid template! Template should be a "string" ' +
+                          'but "' + typeStr(template) + '" was given as the first ' +
+                          'argument for mustache#render(template, view, partials)');
+    }
+
+    return defaultWriter.render(template, view, partials, config);
+  };
+
+  // Export the escaping function so that the user may override it.
+  // See https://github.com/janl/mustache.js/issues/244
+  mustache.escape = escapeHtml;
+
+  // Export these mainly for testing, but also for advanced usage.
+  mustache.Scanner = Scanner;
+  mustache.Context = Context;
+  mustache.Writer = Writer;
+
+  return mustache;
+
+})));
 
 
 /***/ }),
@@ -9713,14 +9370,6 @@ module.exports = require("util");
 
 "use strict";
 module.exports = require("zlib");
-
-/***/ }),
-
-/***/ 3558:
-/***/ ((module) => {
-
-"use strict";
-module.exports = {"i8":"3.1.6"};
 
 /***/ }),
 
