@@ -99,7 +99,8 @@ function run() {
             if (!id) {
                 id = "default-id";
             }
-            if (github.context.eventName !== "pull_request") {
+            if (github.context.eventName !== "pull_request" &&
+                github.context.eventName !== "pull_request_target") {
                 throw new Error("Action can not be run on a non pull request event");
             }
             const prContext = github.context.payload;
