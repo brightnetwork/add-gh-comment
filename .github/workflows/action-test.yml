@@ -3,6 +3,10 @@ name: 'action-test'
 on:
   pull_request:
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   comment-multiline:
     runs-on: ubuntu-latest
