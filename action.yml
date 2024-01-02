@@ -18,5 +18,5 @@ inputs:
     required: false
     description: 'additional variable use during templating'
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'
