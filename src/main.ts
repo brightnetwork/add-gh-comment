@@ -7,7 +7,11 @@ import { render } from "./templating";
 async function run(): Promise<void> {
   try {
     let body: string | undefined | null = core.getInput("body");
-    if (!body) {
+    const enabled =
+      !core.getInput("skip-comment") ||
+      core.getInput("skip-comment").toLowerCase() === "false";
+
+    if (!body && enabled) {
       const template: string | undefined = core.getInput("template-path");
       if (!template) {
         throw new Error("Template input is required if body is ");
@@ -40,7 +44,9 @@ async function run(): Promise<void> {
       octokit: github.getOctokit(core.getInput("token", { required: true })),
     };
     await removeComments(id, context);
-    await addComment({ id, body }, context);
+    if (enabled) {
+      await addComment({ id, body }, context);
+    }
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);

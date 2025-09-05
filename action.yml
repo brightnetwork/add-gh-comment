@@ -17,6 +17,9 @@ inputs:
   template-var:
     required: false
     description: 'additional variable use during templating'
+  skip-comment:
+    required: false
+    description: 'if this input is set to a non-falsy value, the comment will be skipped. Any previously posted comment with the same id will be deleted'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
