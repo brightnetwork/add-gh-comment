@@ -86,13 +86,6 @@ async function run() {
         let body = core.getInput("body");
         const enabled = !core.getInput("skip-comment") ||
             core.getInput("skip-comment").toLowerCase() === "false";
-        console.log({
-            enabled,
-            f: core.getInput("skip-comment"),
-            s: core.getInput("skip-comment").toLowerCase(),
-            b: body,
-            id: core.getInput("id"),
-        });
         if (!body && enabled) {
             const template = core.getInput("template-path");
             if (!template) {
