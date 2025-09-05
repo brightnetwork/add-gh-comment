@@ -84,7 +84,16 @@ const templating_1 = __nccwpck_require__(7687);
 async function run() {
     try {
         let body = core.getInput("body");
-        if (!body) {
+        const enabled = !core.getInput("skip-comment") ||
+            core.getInput("skip-comment").toLowerCase() === "false";
+        console.log({
+            enabled,
+            f: core.getInput("skip-comment"),
+            s: core.getInput("skip-comment").toLowerCase(),
+            b: body,
+            id: core.getInput("id"),
+        });
+        if (!body && enabled) {
             const template = core.getInput("template-path");
             if (!template) {
                 throw new Error("Template input is required if body is ");
@@ -111,7 +120,9 @@ async function run() {
             octokit: github.getOctokit(core.getInput("token", { required: true })),
         };
         await (0, comment_1.removeComments)(id, context);
-        await (0, comment_1.addComment)({ id, body }, context);
+        if (enabled) {
+            await (0, comment_1.addComment)({ id, body }, context);
+        }
     }
     catch (error) {
         if (error instanceof Error) {
