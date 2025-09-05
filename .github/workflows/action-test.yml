@@ -11,7 +11,7 @@ jobs:
   comment-multiline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./
         with:
           id: comment-multiline
@@ -23,7 +23,7 @@ jobs:
   comment-body-inline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./
         with:
           body: |
@@ -32,7 +32,7 @@ jobs:
   comment-template:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./
         with:
           id: comment-template
@@ -43,7 +43,7 @@ jobs:
     needs: 
       - comment-template
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./
         with:
           id: comment-template
@@ -52,12 +52,53 @@ jobs:
   comment-template-with-var:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./
         with:
           id: comment-template-with-var
           template-path: .github/comment-with-var.md
           template-var: commit-hash - ${{ github.event.pull_request.head.sha }}
+
+  skip-comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./
+        with:
+          id: skip-comment-1
+          body: This comment should be skipped!
+          skip-comment: not a falsy value
+
+      - id: somestep
+        run: echo "value=1" >> "$GITHUB_OUTPUT"
+
+      - uses: ./
+        with:
+          id: skip-comment-2
+          body: This comment should be deleted
+
+      - uses: ./
+        with:
+          id: skip-comment-2
+          body: This comment should be skipped!
+          skip-comment: ${{ steps.somestep.outputs.value }}
+
+      - id: someotherstep
+        run: echo "value=" >> "$GITHUB_OUTPUT"
+
+      - uses: ./
+        with:
+          id: skip-comment-3
+          body: This comment should not be skipped!
+          skip-comment: ${{ steps.someotherstep.outputs.value }}
+
+
+      - uses: ./
+        with:
+          id: skip-comment-4
+          body: this comment should not be skipped!
+          skip-comment: false
+
 
   test-main:
     runs-on: ubuntu-latest
@@ -67,8 +108,9 @@ jobs:
       - comment-body-inline
       - comment-multiline
       - comment-template-with-var
+      - skip-comment
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           npm install
       - run: |
@@ -76,7 +118,7 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const { assertOneComment } = require(`${process.env.GITHUB_WORKSPACE}/lib/find-comment-tests`)
+            const { assertNoComment, assertOneComment } = require(`${process.env.GITHUB_WORKSPACE}/lib/find-comment-tests`)
 
             // test by body input 
             await assertOneComment(github, context.payload, /inline body with context payload/)
@@ -105,3 +147,9 @@ jobs:
             await assertOneComment(github, context.payload, /default-id --/)
             await assertOneComment(github, context.payload, /comment-template --/)
             await assertOneComment(github, context.payload, /comment-template-with-var --/)
+
+            // test skip-comment
+            await assertOneComment(github, context.payload, /skip-comment-3/)
+            await assertOneComment(github, context.payload, /skip-comment-4/)
+            await assertNoComment(github, context.payload, /skip-comment-1/)
+            await assertNoComment(github, context.payload, /skip-comment-2/)

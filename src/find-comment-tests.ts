@@ -29,3 +29,16 @@ export const assertOneComment = async (
     );
   }
 };
+
+export const assertNoComment = async (
+  github: Octokit,
+  context: PullRequestEvent,
+  regexp: RegExp,
+): Promise<void> => {
+  const count = await numberOfCommentsMatching(github, context, regexp);
+  if (count !== 0) {
+    throw new Error(
+      `Invalid number of comment found for regexp ${regexp}: ${count}`,
+    );
+  }
+};

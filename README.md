@@ -29,7 +29,7 @@ The `id: frontend-coverage` here ensure the de-duplication. If a comment created
   with:
     id: backend-coverage
     template-path: .github/templates/comment.md
-    template-var: step.XX.outputs.2
+    template-var: ${{ step.XX.outputs.2 }}
 ```
 
 Templating is done with [ejs](https://ejs.co/).
@@ -50,6 +50,20 @@ Step 2 output: <%= input %>
 
 </details>
 ```
+
+### Conditional comment
+
+```yaml
+- uses: brightnetwork/add-gh-comment@v0.1
+  with:
+    id: backend-coverage
+    skip-comment: ${{ step.XX.outputs.2 == '' }}
+    template-path: .github/templates/comment.md
+    template-var: ${{ steps.XX.outputs.2 }}
+```
+
+This will skip the comment if the `skip-comment` input is set to a truthy value.
+This is different from skipping the action, as the action will still run and delete any previous comment with the same id.
 
 ## State of the art comparison
 
