@@ -1,5 +1,5 @@
 import type { PullRequestEvent } from "@octokit/webhooks-definitions/schema";
-import { Octokit, UNIQUE_ID } from "./comment";
+import { Octokit, UNIQUE_ID } from "./comment.js";
 
 const numberOfCommentsMatching = (
   github: Octokit,
