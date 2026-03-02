@@ -11,7 +11,7 @@ jobs:
   comment-multiline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           id: comment-multiline
@@ -23,7 +23,7 @@ jobs:
   comment-body-inline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           body: |
@@ -32,7 +32,7 @@ jobs:
   comment-template:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           id: comment-template
@@ -43,7 +43,7 @@ jobs:
     needs: 
       - comment-template
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           id: comment-template
@@ -52,7 +52,7 @@ jobs:
   comment-template-with-var:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           id: comment-template-with-var
@@ -62,7 +62,7 @@ jobs:
   skip-comment:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           id: skip-comment-1
@@ -110,7 +110,7 @@ jobs:
       - comment-template-with-var
       - skip-comment
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - run: |
           npm install
       - run: |
