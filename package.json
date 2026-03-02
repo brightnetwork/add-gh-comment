@@ -2,6 +2,7 @@
   "name": "add-gh-comment",
   "version": "0.1.0",
   "description": "Add a github comment",
+  "type": "module",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -22,6 +23,7 @@
     "@typescript-eslint/parser": "^8.45.0",
     "@vercel/ncc": "^0.38.3",
     "eslint": "^8.54.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-github": "^4.10.2",
     "eslint-plugin-jest": "^28.9.0",
     "eslint-plugin-prettier": "^5.2.1",

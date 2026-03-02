@@ -118,7 +118,7 @@ jobs:
       - uses: actions/github-script@v8
         with:
           script: |
-            const { assertNoComment, assertOneComment } = require(`${process.env.GITHUB_WORKSPACE}/lib/find-comment-tests`)
+            const { assertNoComment, assertOneComment } = await import(`${process.env.GITHUB_WORKSPACE}/lib/find-comment-tests.js`)
 
             // test by body input 
             await assertOneComment(github, context.payload, /inline body with context payload/)

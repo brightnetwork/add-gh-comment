@@ -1,8 +1,8 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import type { PullRequestEvent } from "@octokit/webhooks-definitions/schema";
-import { addComment, removeComments } from "./comment";
-import { render } from "./templating";
+import { addComment, removeComments } from "./comment.js";
+import { render } from "./templating.js";
 
 async function run(): Promise<void> {
   try {
