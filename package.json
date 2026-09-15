@@ -4,6 +4,9 @@
   "description": "Add a github comment",
   "type": "module",
   "main": "lib/main.js",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "tsc",
     "format": "prettier --write '**/*.ts'",
