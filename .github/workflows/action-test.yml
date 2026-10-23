@@ -5,15 +5,19 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   comment-multiline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./
+        with:
+          persist-credentials: false
+      - uses: $/
         with:
           id: comment-multiline
           body: |
@@ -23,38 +27,62 @@ jobs:
 
   comment-body-inline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./
+        with:
+          persist-credentials: false
+      - uses: $/
         with:
           body: |
             ${{ github.event.pull_request.head.sha }} **CI check: inline body without id**
 
   comment-template:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./
+        with:
+          persist-credentials: false
+      - uses: $/
         with:
           id: comment-template
           template-path: .github/comment.md
 
   comment-template-bis:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     needs: 
       - comment-template
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./
+        with:
+          persist-credentials: false
+      - uses: $/
         with:
           id: comment-template
           template-path: .github/comment.md
 
   comment-template-with-var:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./
+        with:
+          persist-credentials: false
+      - uses: $/
         with:
           id: comment-template-with-var
           template-path: .github/comment-with-var.md
@@ -62,9 +90,15 @@ jobs:
 
   skip-comment:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./
+        with:
+          persist-credentials: false
+      - uses: $/
         with:
           id: skip-comment-1
           body: This comment should be skipped!
@@ -73,12 +107,12 @@ jobs:
       - id: somestep
         run: echo "value=1" >> "$GITHUB_OUTPUT"
 
-      - uses: ./
+      - uses: $/
         with:
           id: skip-comment-2
           body: This comment should be deleted
 
-      - uses: ./
+      - uses: $/
         with:
           id: skip-comment-2
           body: This comment should be skipped!
@@ -87,14 +121,14 @@ jobs:
       - id: someotherstep
         run: echo "value=" >> "$GITHUB_OUTPUT"
 
-      - uses: ./
+      - uses: $/
         with:
           id: skip-comment-3
           body: This comment should not be skipped!
           skip-comment: ${{ steps.someotherstep.outputs.value }}
 
 
-      - uses: ./
+      - uses: $/
         with:
           id: skip-comment-4
           body: this comment should not be skipped!
@@ -103,6 +137,10 @@ jobs:
 
   test-main:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
     needs: 
       - comment-template
       - comment-template-bis
@@ -112,6 +150,8 @@ jobs:
       - skip-comment
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: |
           npm install
       - run: |
