@@ -1,0 +1,4 @@
+# False positive in the generated source map: @actions/http-client's
+# BasicCredentialHandler assigns a constructor parameter, with no literal credential.
+# Ignore only this finding in this commit; keep all other findings enabled.
+a0ac9fc5e500ef8fc5045b15e934678116b5a662:dist/index.js.map:generic-password:1

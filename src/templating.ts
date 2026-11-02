@@ -1,4 +1,4 @@
-import * as ejs from "ejs";
+import ejs from "ejs";
 
 export const render = (
   template: string,
